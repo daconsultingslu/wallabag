@@ -1,0 +1,49 @@
+name: Upkeep Guardrail post
+on:
+  workflow_run:
+    workflows: [Upkeep Guardrail]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  post:
+    # A pull request from another repository has no number here: nothing is posted.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.pull_requests[0].number
+    runs-on: ubuntu-latest
+    steps:
+      - id: download
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: upkeep-guardrail
+          path: ${{ runner.temp }}/upkeep-guardrail
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - if: steps.download.outcome == 'success'
+        uses: actions/checkout@v7
+        with:
+          repository: daconsultingslu/upkeep
+          ref: b44cf68303c7af07155afa5e38fb0fe40ea09a2d
+          token: ${{ secrets.UPKEEP_READ_TOKEN }}
+          path: .upkeep-src
+          persist-credentials: false
+      - if: steps.download.outcome == 'success'
+        uses: pnpm/action-setup@v6
+        with: { package_json_file: .upkeep-src/package.json }
+      - if: steps.download.outcome == 'success'
+        uses: actions/setup-node@v7
+        with: { node-version-file: .upkeep-src/.nvmrc }
+      # Installed without the write token: no dependency's script sees it.
+      - if: steps.download.outcome == 'success'
+        working-directory: .upkeep-src
+        run: pnpm install --frozen-lockfile
+      - if: steps.download.outcome == 'success'
+        working-directory: .upkeep-src
+        env:
+          UPKEEP_GITHUB_TOKEN: ${{ secrets.UPKEEP_GITHUB_TOKEN }}
+          TARGET: ${{ github.repository }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          pnpm upkeep guard post "$RUNNER_TEMP/upkeep-guardrail" --target "$TARGET" --pr "$PR" \
+            --db "$RUNNER_TEMP/upkeep/upkeep.db"

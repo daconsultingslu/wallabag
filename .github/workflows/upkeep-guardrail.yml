@@ -1,0 +1,14 @@
+name: Upkeep Guardrail
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: daconsultingslu/upkeep/.github/actions/guardrail@b44cf68303c7af07155afa5e38fb0fe40ea09a2d
+        with:
+          upkeep-token: ${{ secrets.UPKEEP_READ_TOKEN }}
+          upkeep-ref: b44cf68303c7af07155afa5e38fb0fe40ea09a2d
